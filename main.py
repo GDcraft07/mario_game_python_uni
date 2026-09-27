@@ -10,14 +10,13 @@ def main():
     clock = pygame.time.Clock()
 
     mario_size = (40, 60)
-    mario_pos = pygame.Vector2(0, height - mario_size[1])
-    mario_victor = pygame.Vector2(0, 0)
+    mario_pos = pygame.Vector2(20, height - mario_size[1])
+    mario_vel = pygame.Vector2(0, 0)
     speed = 200
     jump = 500
     gravity = 1000
-    matio_hb = pygame.Rect(mario_pos.x, mario_pos.y, mario_size[0], mario_size[1])
-
-    platforms = [pygame.Rect(300, height - 100, 200, 30), pygame.Rect(100, height - 200, 200, 30), pygame.Rect(0, height - 300, 150, 30)]
+    mario_hb = pygame.Rect(mario_pos.x, mario_pos.y, mario_size[0], mario_size[1])
+    mario_on_ground = True
 
     while not done:
         dt = clock.tick(60) / 1000
@@ -27,39 +26,36 @@ def main():
                 done = True
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    mario_victor.y = -jump
+                if event.key == pygame.K_SPACE and mario_on_ground:
+                    mario_vel.y = -jump
+                    mario_on_ground = False
 
         keys = pygame.key.get_pressed()
 
-        mario_victor.x = 0
+        if mario_on_ground:
+            mario_vel.x = 0
+            if keys[pygame.K_d]:
+                mario_vel.x = speed
+            if keys[pygame.K_a]:
+                mario_vel.x = -speed
 
-        if keys[pygame.K_d]:
-            mario_victor.x = speed
+        mario_vel.y += gravity * dt
 
-        if keys[pygame.K_a]:
-            mario_victor.x = -speed
+        mario_pos.x += mario_vel.x * dt
+        mario_hb.x = mario_pos.x
 
-        mario_victor.y += gravity * dt
+        mario_pos.y += mario_vel.y * dt
+        mario_hb.y = mario_pos.y
 
-        mario_pos.x += mario_victor.x * dt
-        matio_hb.x = mario_pos.x
-
-        mario_pos.y += mario_victor.y * dt
-        matio_hb.y = mario_pos.y
-
-        if matio_hb.y + mario_size[1] >= height:
-            matio_hb.y = height - mario_size[1]
-            mario_pos.y = matio_hb.y
-            mario_victor.y = 0
+        mario_on_ground = False
+        if mario_hb.bottom >= height:
+            mario_hb.bottom = height
+            mario_pos.y = mario_hb.y
+            mario_vel.y = 0
+            mario_on_ground = True
 
         screen.fill((255, 255, 255))
-
-        for platform in platforms:
-            pygame.draw.rect(screen, (0, 0, 0), platform)
-
-        pygame.draw.rect(screen, (0, 0, 0), matio_hb)
-
+        pygame.draw.rect(screen, (0, 0, 0), mario_hb)
         pygame.display.flip()
 
 
