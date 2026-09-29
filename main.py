@@ -1,6 +1,15 @@
+import os
 import pygame
 import random
 from collections import deque
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_image(name, size):
+    image = pygame.image.load(os.path.join(BASE_DIR, name)).convert_alpha()
+    return pygame.transform.smoothscale(image, size)
 
 
 def platform_gap(platform_1, platform_2):
@@ -147,7 +156,7 @@ def generate_level(width, row_y, platform_widths, platform_height, ground_y, max
 
     exit_hb = pygame.Rect(exit_plat["x"] + exit_plat["w"] // 2 - 15, exit_plat["y"] - 30, 30, 30)
 
-    enemies = [{"pos": pygame.Vector2(width - 60, ground_y - 60), "vel": pygame.Vector2(random.choice([-120, 120]), 0), "hb": pygame.Rect(width - 60, ground_y - 60, 40, 60), "kind": "random", "on_ground": True, "node": 0}, {"pos": pygame.Vector2(width - 120, ground_y - 60), "vel": pygame.Vector2(0, 0), "hb": pygame.Rect(width - 120, ground_y - 60, 40, 60), "kind": "chase", "on_ground": True, "node": 0}]
+    enemies = [{"pos": pygame.Vector2(width - 60, ground_y - 60), "vel": pygame.Vector2(random.choice([-120, 120]), 0), "hb": pygame.Rect(width - 60, ground_y - 60, 40, 60), "kind": "random", "on_ground": True, "node": 0, "facing": 1}, {"pos": pygame.Vector2(width - 120, ground_y - 60), "vel": pygame.Vector2(0, 0), "hb": pygame.Rect(width - 120, ground_y - 60, 40, 60), "kind": "chase", "on_ground": True, "node": 0, "facing": 1}]
 
     return {"platforms": platforms, "coins": coins, "exit_hb": exit_hb, "enemies": enemies, "nodes": nodes, "graph": graph}
 
@@ -289,12 +298,25 @@ def main():
     mario_hb = pygame.Rect(mario_pos.x, mario_pos.y, mario_size[0], mario_size[1])
     mario_on_ground = True
     mario_node = 0
+    mario_facing = 1
 
     lives = 3
     invuln_timer = 0.0
     invuln_time = 2.0
     chase_speed = 170
     enemy_jump_vel = -jump
+
+    enemy_size = (40, 60)
+    coin_size = (24, 24)
+    heart_size = (32, 32)
+
+    mario_right_img = load_image("marioR.png", mario_size)
+    mario_left_img = load_image("marioL.png", mario_size)
+    koopa_right_img = load_image("koopa_troopa_r.png", enemy_size)
+    koopa_left_img = load_image("koopa_troopa_l.png", enemy_size)
+    goomba_img = load_image("goomba.png", enemy_size)
+    coin_img = load_image("mario_money.png", coin_size)
+    heart_img = load_image("heart.png", heart_size)
 
     total_levels = 3
     level_index = 0
@@ -323,9 +345,11 @@ def main():
 
                 if keys[pygame.K_d]:
                     mario_vel.x = speed
+                    mario_facing = 1
 
                 if keys[pygame.K_a]:
                     mario_vel.x = -speed
+                    mario_facing = -1
 
             mario_on_ground = apply_physics(mario_pos, mario_vel, mario_hb, mario_size, dt, gravity, level["platforms"], ground_y, level_width)
             node = find_node(mario_hb, mario_on_ground, level["nodes"], ground_y)
@@ -344,6 +368,12 @@ def main():
                 
                 else:
                     update_enemy_chase(enemy, dt, gravity, enemy_jump_vel, chase_speed, level["platforms"], ground_y, level_width, level["nodes"], level["graph"], mario_pos.x, mario_node)
+
+                if enemy["vel"].x > 0:
+                    enemy["facing"] = 1
+
+                elif enemy["vel"].x < 0:
+                    enemy["facing"] = -1
 
             for coin in level["coins"]:
                 coin_hb = pygame.Rect(coin["x"] - 10, coin["y"] - 10, 20, 20)
@@ -387,7 +417,8 @@ def main():
             
             for coin in level["coins"]:
                 if not coin["collected"]:
-                    pygame.draw.circle(screen, (240, 200, 40), (coin["x"] - camera_x, coin["y"]), 10)
+                    coin_rect = coin_img.get_rect(center=(coin["x"] - camera_x, coin["y"]))
+                    screen.blit(coin_img, coin_rect)
 
             all_coins_collected = all(c["collected"] for c in level["coins"])
             exit_color = (40, 180, 40) if all_coins_collected else (120, 120, 120)
@@ -395,15 +426,25 @@ def main():
             pygame.draw.rect(screen, exit_color, (exit_hb.x - camera_x, exit_hb.y, exit_hb.w, exit_hb.h))
 
             for enemy in level["enemies"]:
-                color = (200, 40, 40) if enemy["kind"] == "random" else (150, 40, 180)
-                pygame.draw.rect(screen, color, (enemy["hb"].x - camera_x, enemy["hb"].y, enemy["hb"].w, enemy["hb"].h))
+                if enemy["kind"] == "random":
+                    img = goomba_img
+
+                else:
+                    img = koopa_right_img if enemy["facing"] == 1 else koopa_left_img
+
+                screen.blit(img, (enemy["hb"].x - camera_x, enemy["hb"].y))
 
             if invuln_timer == 0 or int(invuln_timer * 10) % 2 == 0:
-                pygame.draw.rect(screen, (0, 0, 0), (mario_hb.x - camera_x, mario_hb.y, mario_hb.w, mario_hb.h))
+                mario_img = mario_right_img if mario_facing == 1 else mario_left_img
+                screen.blit(mario_img, (mario_hb.x - camera_x, mario_hb.y))
 
             collected = sum(1 for c in level["coins"] if c["collected"])
-            info = f"Уровень: {level_index + 1}/{total_levels}  Жизни: {lives}  Монеты: {collected}/{len(level['coins'])}"
+            info = f"Уровень: {level_index + 1}/{total_levels}  Монеты: {collected}/{len(level['coins'])}"
             screen.blit(small_font.render(info, True, (0, 0, 0)), (10, 10))
+
+            for i in range(lives):
+                heart_x = width - 10 - (i + 1) * (heart_size[0] + 5) + 5
+                screen.blit(heart_img, (heart_x, 8))
 
         elif state == 1:
             text = font.render("ПОБЕДА!", True, (20, 120, 20))
